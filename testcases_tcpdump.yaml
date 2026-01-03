@@ -1,0 +1,54 @@
+testcases:
+  - id: TC1
+    description: "Check tcpdump version"
+    pre_actions: []                    # optional commands to run before test
+    check_command: "tcpdump --version | head -n 1"
+    expected_output_substring: "tcpdump"
+    timeout: 5
+
+  - id: TC2
+    description: "Capture 10 packets"
+    interface: ""                      # empty = auto-detect interface
+    pre_actions:
+      - "ping -c 20 google.com"  # will be run on same host; {iface} replaced by runner
+    check_command: 'sudo timeout {timeout} tcpdump -i {iface} -c 10 -nn -tt ; echo CAPTURE_OK'
+    expected_output_substring: "CAPTURE_OK"
+    timeout: 8
+    capture_output: true     # <-- IMPORTANT
+    notes: ""                # <-- automatically filled by main.py
+
+  - id: TC3
+    description: "Capture only ICMP packets"
+    pre_actions:
+      - "ping -c 5 -I {iface} 8.8.8.8"
+    check_command: 'sudo timeout {timeout} tcpdump -i {iface} icmp -c 5 -nn -tt ; echo ICMP_OK'
+    expected_output_substring: "ICMP_OK"
+    timeout: 6
+
+  - id: TC4
+    description: "Filter packets with IP 8.8.8.8"
+    pre_actions:
+      - "ping -c 5 -I {iface} 8.8.8.8"
+    check_command: 'sudo timeout {timeout} tcpdump -i {iface} host 8.8.8.8 -c 3 -nn -tt ; echo FILTER_OK'
+    expected_output_substring: "FILTER_OK"
+    timeout: 6
+
+  - id: TC5
+    description: "Packet monitoring"
+    pre_actions:
+      - "ping -c 30 -I {iface} 8.8.8.8"
+    check_command: >
+      sudo timeout {timeout} tcpdump -i {iface} -c 30 -nn -tt |
+      awk '{
+             print $0;
+             for(i=1;i<=NF;i++)
+               if($i=="length")
+                 sum+=$(i+1)
+           }
+           END{
+             bw=(sum*8)/{timeout};
+             printf "\nTotal Bytes: %d\nBandwidth: %.2f bps\n", sum, bw
+           }';
+      echo BANDWIDTH_OK
+    expected_output_substring: "BANDWIDTH_OK"
+    timeout: 12
